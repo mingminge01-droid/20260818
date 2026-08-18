@@ -1,6 +1,6 @@
 # GRAD PATH
 
-성균관대학교 GLS 수강·취득 과목 PDF를 브라우저에서 분석하고, 사용자가 선택한 경우 정규화된 분석 결과만 Supabase에 저장하는 웹 앱입니다. PDF 원본은 Supabase로 전송하지 않습니다.
+성균관대학교 GLS 수강·취득 과목 PDF를 브라우저에서 분석하고, 분석이 끝나면 정규화된 결과를 Supabase에 자동 저장하는 웹 앱입니다. PDF 원본은 Supabase로 전송하지 않습니다.
 
 ## Supabase 설정
 
