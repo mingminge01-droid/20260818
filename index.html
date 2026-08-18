@@ -1,0 +1,436 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>GRAD PATH — 졸업 요건 분석</title>
+  <meta name="description" content="GLS PDF를 올리면 졸업 진행률과 부족 요건을 한눈에 보여주는 프로토타입">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@500;600;700;800&family=Noto+Sans+KR:wght@400;500;600;700;800;900&display=swap');
+    :root{--ink:#17221b;--muted:#68736b;--line:#dde5de;--paper:#f4f7f2;--card:#fff;--green:#195d3b;--deep:#123d29;--lime:#c9f04d;--pale:#edf6e9;--amber:#a85a0c;--amber-bg:#fff5e6;--red:#a43f39;--red-bg:#fff0ee;--shadow:0 24px 70px rgba(25,59,39,.12)}
+    *{box-sizing:border-box}html,body{margin:0;min-height:100%;font-family:'DM Sans','Noto Sans KR',sans-serif;color:var(--ink);background:var(--paper);-webkit-font-smoothing:antialiased}button,input{font:inherit}button{cursor:pointer}.hidden{display:none!important}
+    .brand{position:fixed;left:30px;top:25px;z-index:10;display:flex;align-items:center;gap:11px;font-size:15px;font-weight:900;letter-spacing:-.03em;transition:.2s}.brand-mark{width:35px;height:35px;border-radius:11px;background:var(--deep);color:var(--lime);display:grid;place-items:center;transform:rotate(-5deg)}.brand small{display:block;color:#829087;font-size:9px;letter-spacing:.14em;margin-top:1px}body.result-mode .brand{color:#fff}body.result-mode .brand small{color:#aac0b2}body.result-mode .brand-mark{background:var(--lime);color:var(--deep)}
+    .screen{min-height:100vh}.upload-screen{display:grid;place-items:center;padding:96px 24px 42px;position:relative;overflow:hidden}.upload-screen:before,.upload-screen:after{content:"";position:absolute;border-radius:50%;pointer-events:none}.upload-screen:before{width:470px;height:470px;border:95px solid rgba(201,240,77,.2);right:-210px;top:-170px}.upload-screen:after{width:360px;height:360px;background:rgba(25,93,59,.055);left:-210px;bottom:-180px}
+    .upload-shell{width:min(720px,100%);text-align:center;position:relative;z-index:1}.kicker{display:inline-flex;align-items:center;gap:8px;color:var(--green);font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase}.kicker:before{content:"";width:7px;height:7px;border-radius:50%;background:var(--lime);box-shadow:0 0 0 5px rgba(201,240,77,.25)}h1{font-size:clamp(34px,6vw,62px);line-height:1.1;letter-spacing:-.055em;margin:20px 0 30px}h1 em{font-style:normal;color:var(--green)}
+    .download-guide{margin:0 auto 22px;padding:16px 20px;background:rgba(25,93,59,.07);border:1px solid rgba(25,93,59,.12);border-radius:18px}.download-guide .guide-label{display:block;margin-bottom:11px;color:var(--green);font-size:11px;font-weight:900;letter-spacing:.06em}.guide-steps{display:flex;align-items:center;justify-content:center;gap:14px}.guide-step{font-size:14px;font-weight:800;letter-spacing:-.025em}.guide-arrow{color:var(--green);font-size:18px;font-weight:900}.drop-zone{background:rgba(255,255,255,.88);border:1.5px dashed #98ad9e;border-radius:28px;padding:42px 28px 34px;box-shadow:var(--shadow);transition:.2s}.drop-zone.drag{border-color:var(--green);background:var(--pale);transform:translateY(-2px)}.upload-icon{width:62px;height:62px;border-radius:20px;background:var(--deep);color:var(--lime);display:grid;place-items:center;margin:0 auto 18px}.upload-icon svg{width:28px}.drop-zone h2{font-size:20px;letter-spacing:-.03em;margin:0 0 8px}.drop-zone p{font-size:13px;color:var(--muted);margin:0 0 20px}.file-button{display:inline-block;border:0;background:var(--green);color:#fff;border-radius:13px;padding:13px 21px;font-weight:800;font-size:13px;box-shadow:0 7px 17px rgba(25,93,59,.2)}.file-button:hover{background:#124c2f}.file-input{display:none}.privacy{display:flex;align-items:center;justify-content:center;gap:7px;color:#7b8780;font-size:11px;margin-top:19px}.privacy svg{width:14px}.format-note{margin-top:16px;color:#8a948e;font-size:11px}.reference-note{margin:15px auto 0;padding-top:14px;border-top:1px solid rgba(25,93,59,.12);max-width:620px;color:#76837a;font-size:10px;line-height:1.7}.reference-note strong{color:var(--green)}.reference-note a{color:inherit;text-underline-offset:3px}.reference-note a:hover{color:var(--green)}
+    .analysis-screen{display:grid;place-items:center;padding:80px 24px}.analysis-card{width:min(540px,100%);text-align:center;background:#fff;border:1px solid var(--line);border-radius:28px;padding:48px 38px;box-shadow:var(--shadow)}.scan{width:90px;height:110px;border:1.5px solid var(--line);border-radius:11px;margin:0 auto 26px;position:relative;background:linear-gradient(#fff,#f8faf7);overflow:hidden}.scan:before{content:"PDF";position:absolute;top:17px;left:0;right:0;color:var(--green);font-weight:900;font-size:11px}.scan:after{content:"";position:absolute;left:10px;right:10px;height:3px;border-radius:9px;background:var(--lime);box-shadow:0 0 14px var(--lime);animation:scan 1.5s ease-in-out infinite}@keyframes scan{0%{top:40px}50%{top:92px}100%{top:40px}}.analysis-card h2{margin:0 0 9px;font-size:24px;letter-spacing:-.04em}.analysis-card p{color:var(--muted);font-size:13px;margin:0 0 25px}.progress-line{height:7px;background:#edf0ed;border-radius:99px;overflow:hidden}.progress-line span{display:block;height:100%;width:12%;background:var(--green);border-radius:inherit;transition:width .35s}.steps{display:flex;justify-content:space-between;margin-top:12px;color:#9aa39d;font-size:10px}.steps .active{color:var(--green);font-weight:800}
+    .result-screen{padding-bottom:70px}.result-top{background:var(--deep);color:white;padding:104px 32px 42px}.result-inner{max-width:1120px;margin:0 auto}.result-nav{display:flex;align-items:center;justify-content:space-between;gap:18px;margin-bottom:18px}.result-nav .doc{font-size:12px;color:#bad0c1}.student-card{display:grid;grid-template-columns:repeat(4,1fr);margin-bottom:38px;border:1px solid rgba(255,255,255,.14);border-radius:17px;background:rgba(255,255,255,.075);overflow:hidden}.student-field{padding:14px 17px;border-right:1px solid rgba(255,255,255,.1)}.student-field:last-child{border-right:0}.student-field span{display:block;margin-bottom:5px;color:#9fb7a7;font-size:9px;font-weight:800;letter-spacing:.08em}.student-field strong{display:block;font-size:15px;letter-spacing:-.025em}.ghost{border:1px solid rgba(255,255,255,.25);border-radius:11px;background:transparent;color:#fff;padding:10px 14px;font-weight:700;font-size:12px}.ghost:hover{background:rgba(255,255,255,.08)}.hero-grid{display:grid;grid-template-columns:minmax(300px,.95fr) minmax(340px,1.05fr);gap:60px;align-items:center}.score-label{font-size:12px;font-weight:800;color:#b7ccbe;letter-spacing:.08em}.score{font-size:clamp(86px,13vw,150px);font-weight:900;line-height:.9;color:var(--lime);letter-spacing:-.075em;margin:16px 0 22px}.score small{font-size:.35em;letter-spacing:-.03em}.score-copy{font-size:17px;line-height:1.65;letter-spacing:-.02em}.score-copy strong{color:var(--lime)}.score-sub{margin-top:12px;color:#b7cbbd;font-size:12px;line-height:1.7}.missing-title{display:flex;align-items:center;gap:9px;font-size:16px;font-weight:900;margin-bottom:13px;letter-spacing:-.025em}.missing-title:before{content:"!";width:25px;height:25px;border-radius:50%;display:grid;place-items:center;background:#ffb754;color:#4b2a00;font-size:13px}.missing-title span{background:#ffb754;color:#4b2a00;border-radius:999px;padding:4px 9px;font-size:11px}.missing-list{display:grid;gap:10px}.missing-item{display:grid;grid-template-columns:38px 1fr auto;gap:13px;align-items:center;background:linear-gradient(90deg,rgba(201,66,49,.22),rgba(255,183,84,.08));border:1px solid rgba(255,183,84,.43);border-left:4px solid #ffb754;border-radius:15px;padding:14px 15px 14px 12px;box-shadow:0 8px 22px rgba(0,0,0,.08)}.missing-item .icon{width:38px;height:38px;border-radius:11px;background:#ffb754;color:#4b2a00;display:grid;place-items:center;font-weight:900}.missing-item strong{display:block;font-size:14px;font-weight:900}.missing-item p{margin:4px 0 0;color:#d2ddd5;font-size:11px;line-height:1.45}.tag{color:#532c00;background:#ffd79f;border:1px solid #ffe4bd;border-radius:99px;padding:6px 9px;font-size:10px;font-weight:900;white-space:nowrap}
+    .content{max-width:1120px;margin:0 auto;padding:34px 32px}.notice{display:flex;gap:13px;background:var(--amber-bg);border:1px solid #f0d3ac;border-radius:16px;padding:16px 18px;color:#714314;font-size:12px;line-height:1.65}.notice b{display:block;margin-bottom:2px}.notice-mark{width:24px;height:24px;flex:0 0 auto;border-radius:50%;background:#f2c987;display:grid;place-items:center;font-weight:900}.section-head{display:flex;justify-content:space-between;align-items:end;margin:34px 0 14px}.eyebrow{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--green);font-weight:900}.section-head h2{font-size:22px;letter-spacing:-.04em;margin:5px 0 0}.source-chip{font-size:10px;color:var(--green);background:var(--pale);border-radius:99px;padding:7px 10px;font-weight:800}.metric-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:13px}.metric{background:#fff;border:1px solid var(--line);border-radius:18px;padding:20px}.metric-label{font-size:11px;color:var(--muted);font-weight:700}.metric-value{font-size:31px;font-weight:900;letter-spacing:-.05em;margin:10px 0 12px}.metric-value small{font-size:12px;color:var(--muted);font-weight:600}.thin{height:5px;background:#e8ece8;border-radius:99px;overflow:hidden}.thin span{display:block;height:100%;background:var(--green);border-radius:inherit}.metric-note{font-size:10px;color:var(--muted);margin-top:9px}.requirement-list{background:#fff;border:1px solid var(--line);border-radius:20px;overflow:hidden}.req-row{display:grid;grid-template-columns:170px 1fr auto;gap:20px;align-items:center;padding:17px 20px;border-bottom:1px solid #edf0ed;transition:.15s}.req-row.warn{background:#fffaf1;border-left:4px solid #e39a35}.req-row.danger{background:#fff3f1;border-left:4px solid #c64d43}.req-row:last-child{border-bottom:0}.req-name{font-size:13px;font-weight:800}.req-row.warn .req-name,.req-row.danger .req-name{font-weight:900}.req-detail{font-size:12px;color:var(--muted);line-height:1.55}.status{font-size:10px;font-weight:900;border-radius:99px;padding:6px 9px;background:var(--pale);color:var(--green);white-space:nowrap}.status.warn{background:#ffe3b8;color:#8b4800;border:1px solid #efbd73;padding:7px 11px}.status.danger{background:#ffcfc9;color:#8e2821;border:1px solid #e99890;padding:7px 11px}.actions{display:flex;justify-content:center;margin-top:30px}.secondary{border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:12px;padding:12px 17px;font-size:12px;font-weight:800}.error-box{margin-top:16px;background:var(--red-bg);color:var(--red);border-radius:12px;padding:12px;font-size:12px;line-height:1.5}
+    .paste-panel{margin-top:14px;background:rgba(255,255,255,.78);border:1px solid var(--line);border-radius:20px;padding:17px;text-align:left}.paste-panel summary{cursor:pointer;color:var(--green);font-size:12px;font-weight:900}.paste-panel p{margin:10px 0;color:var(--muted);font-size:11px;line-height:1.6}.paste-panel textarea{width:100%;min-height:130px;resize:vertical;border:1px solid var(--line);border-radius:13px;padding:13px;background:#fff;color:var(--ink);font:11px/1.55 ui-monospace,SFMono-Regular,Consolas,monospace}.paste-actions{display:flex;justify-content:flex-end;margin-top:10px}.priority-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.priority-card{background:#fff;border:1px solid var(--line);border-top:4px solid var(--green);border-radius:17px;padding:18px}.priority-card.urgent{border-top-color:#dc7319;background:#fffaf3}.priority-card .priority-kicker{color:var(--green);font-size:9px;font-weight:900;letter-spacing:.1em}.priority-card h3{margin:8px 0 7px;font-size:16px;letter-spacing:-.03em}.priority-card p{margin:0;color:var(--muted);font-size:11px;line-height:1.6}.plan-button{margin-top:13px;border:0;border-radius:10px;padding:9px 11px;background:var(--deep);color:#fff;font-size:10px;font-weight:900}.plan-button.saved{background:#73907d}.tree{display:flex;align-items:stretch;gap:9px;overflow-x:auto;padding:2px 0 8px}.tree-node{min-width:170px;flex:1;background:#fff;border:1px solid var(--line);border-radius:16px;padding:16px;position:relative}.tree-node:not(:last-child):after{content:'→';position:absolute;right:-10px;top:50%;z-index:2;color:var(--green);font-weight:900}.tree-node.done{background:var(--pale);border-color:#bdd4c1}.tree-node.current{background:#fff8ed;border-color:#efc58c}.tree-node.alert{background:#fff1ef;border-color:#e7a19a}.tree-node span{font-size:9px;font-weight:900;color:var(--green);letter-spacing:.08em}.tree-node strong{display:block;margin:8px 0 6px;font-size:13px}.tree-node p{margin:0;color:var(--muted);font-size:10px;line-height:1.55}.evidence-list{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.evidence{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px}.evidence strong{display:block;font-size:12px;margin-bottom:6px}.evidence p{margin:0;color:var(--muted);font-size:10px;line-height:1.55}.course-summary{margin-top:12px;color:var(--muted);font-size:10px}.primary-action{border:0;background:var(--green);color:#fff;border-radius:12px;padding:12px 17px;font-size:12px;font-weight:900}
+    @media(max-width:760px){.brand{left:20px;top:18px}.upload-screen{padding-top:86px}.guide-steps{gap:7px}.guide-step{font-size:11px}.guide-arrow{font-size:14px}.student-card{grid-template-columns:1fr 1fr}.student-field{border-bottom:1px solid rgba(255,255,255,.1)}.student-field:nth-child(2){border-right:0}.student-field:nth-child(3),.student-field:nth-child(4){border-bottom:0}.hero-grid{grid-template-columns:1fr;gap:32px}.result-top{padding:90px 20px 34px}.content{padding:25px 18px}.score{font-size:105px}.metric-grid,.priority-grid,.evidence-list{grid-template-columns:1fr}.req-row{grid-template-columns:1fr auto;gap:8px}.req-detail{grid-column:1/-1;grid-row:2}.result-nav{align-items:flex-start}.doc{max-width:210px}.missing-item{grid-template-columns:35px 1fr}.missing-item .tag{grid-column:2;justify-self:start}.section-head{align-items:flex-start;gap:10px}.source-chip{text-align:center}.tree{flex-direction:column}.tree-node:not(:last-child):after{content:'↓';right:auto;left:50%;top:auto;bottom:-13px}}
+  </style>
+  <style>
+    .profile-controls{display:grid;grid-template-columns:2fr 1fr 1.2fr;gap:9px;margin:0 auto 14px;text-align:left}.profile-control label{display:block;margin:0 0 5px 3px;color:var(--muted);font-size:9px;font-weight:900}.profile-control select{width:100%;border:1px solid var(--line);border-radius:11px;padding:10px;background:#fff;color:var(--ink);font-size:11px}
+    @media(max-width:760px){.profile-controls{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+  <div class="brand"><div class="brand-mark">G</div><div>GRAD PATH<small>GRADUATION CHECKER</small></div></div>
+  <main class="screen upload-screen" id="uploadScreen">
+    <section class="upload-shell">
+      <div class="kicker">성균관대학교 학부·대학원 졸업 요건 분석</div>
+      <h1>PDF 한 장이면,<br><em>남은 졸업 요건</em>이 보입니다.</h1>
+      <div class="download-guide"><span class="guide-label">PDF 다운로드 경로</span><div class="guide-steps"><span class="guide-step">GLS</span><span class="guide-arrow">→</span><span class="guide-step">졸업요건충족현황조회</span><span class="guide-arrow">→</span><span class="guide-step">수강/취득 과목 출력</span></div></div>
+      <div class="profile-controls" aria-label="공식 졸업요건 프로필"><div class="profile-control"><label for="departmentOverride">학부 학과 (대학원은 PDF 자동 인식)</label><select id="departmentOverride"><option value="">PDF에서 자동 인식</option></select></div><div class="profile-control"><label for="entryYearOverride">입학 학번 (전 학번)</label><select id="entryYearOverride"><option value="">PDF에서 자동 인식</option></select></div><div class="profile-control"><label for="majorModeOverride">학부 전공 유형</label><select id="majorModeOverride"><option value="">자동 인식</option><option value="single">단일전공</option><option value="double">일반형 복수전공</option><option value="deepDouble">심화형 복수전공</option></select></div></div>
+      <div class="drop-zone" id="dropZone">
+        <div class="upload-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5M5 15v3a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3"/></svg></div>
+        <h2>GLS PDF를 여기에 놓아주세요</h2><p>또는 아래 버튼을 눌러 파일을 선택하세요</p>
+        <label class="file-button" for="fileInput">PDF 선택하기</label><input class="file-input" id="fileInput" type="file" accept="application/pdf,.pdf">
+        <div id="uploadError" class="error-box hidden"></div>
+      </div>
+      <details class="paste-panel"><summary>PDF가 안 읽히나요? GLS 이수내역 텍스트 붙여넣기</summary><p>GLS의 개인별 수강/취득 과목 목록을 전체 선택해 붙여넣으면 같은 방식으로 분석합니다.</p><textarea id="pasteInput" placeholder="학과/전공, 학번, 과목 목록과 학점 합계가 포함되도록 붙여넣어 주세요."></textarea><div class="paste-actions"><button class="file-button" id="pasteAnalyze" type="button">붙여넣은 내용 분석</button></div></details>
+      <div class="privacy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>파일은 서버로 전송되지 않고 이 브라우저에서만 분석됩니다.</div>
+      <div class="format-note">지원 형식 · GLS 학부·대학원 개인별 수강/취득 과목 리스트 PDF · 이미지 PDF는 OCR 자동 적용</div>
+      <div class="reference-note"><strong>참고 기준</strong> · <a href="https://www.skku.edu/_res/skku/etc/%EB%8C%80%ED%95%99%EC%9A%94%EB%9E%8C2026-ebook%EC%9A%A9.pdf" target="_blank" rel="noopener">성균관대학교 2026 대학요람</a> 및 <a href="https://www.skku.edu/state/current/history_rulebook.do?article.offset=0&amp;articleLimit=10&amp;articleNo=127578&amp;mode=view&amp;no=747" target="_blank" rel="noopener">현행 학칙·시행세칙</a><br>학과별 내규와 개인별 공식 판정은 GLS 및 소속 학과 행정실 확인이 필요합니다.</div>
+    </section>
+  </main>
+  <main class="screen analysis-screen hidden" id="analysisScreen">
+    <section class="analysis-card"><div class="scan"></div><h2 id="analysisTitle">PDF를 읽고 있어요</h2><p id="analysisCopy">학점과 미이수 항목을 분류하는 중입니다.</p><div class="progress-line"><span id="analysisBar"></span></div><div class="steps"><span id="step1" class="active">문서 확인</span><span id="step2">이수 내역 분류</span><span id="step3">부족 요건 계산</span></div></section>
+  </main>
+  <main class="screen result-screen hidden" id="resultScreen">
+    <header class="result-top"><div class="result-inner"><div class="result-nav"><div class="doc" id="docProfile">분석 결과</div><button class="ghost" id="newUploadTop">다른 PDF 분석</button></div><div class="student-card" aria-label="학생 정보"><div class="student-field"><span>단과대학</span><strong id="studentCollege">—</strong></div><div class="student-field"><span>학과</span><strong id="studentDepartment">—</strong></div><div class="student-field"><span>입학 학번</span><strong id="studentEntryYear">—</strong></div><div class="student-field"><span>이름</span><strong id="studentName">—</strong></div></div><div class="hero-grid"><section><div class="score-label" id="scoreLabel">현재 취득 학점 기준 진행률</div><div class="score"><span id="percent">82</span><small>%</small></div><div class="score-copy">교과 학점은 <strong id="creditSummary">9학점</strong> 남았어요.</div><div class="score-sub" id="scoreSub">현재 수강 중인 과목을 모두 이수하면 교과학점 51학점을 채웁니다.</div></section><section><div class="missing-title">졸업 전 반드시 해결할 요건 <span id="missingCount">4개</span></div><div class="missing-list" id="missingList"></div></section></div></div></header>
+    <div class="content"><div class="notice"><div class="notice-mark">!</div><div id="noticeText"><b>이 결과는 졸업 가능 여부의 공식 판정이 아닙니다.</b> 입학학번에 해당하는 공식 학사제도 기준과 업로드 문서를 조합한 참고용 분석입니다. 최종 판정은 GLS 졸업요건충족현황 및 학과 행정실에서 확인해야 합니다.</div></div><div class="section-head"><div><div class="eyebrow">Credit overview</div><h2>공식 기준 대비 학점 현황</h2></div><span class="source-chip">학번별 공식 프로필</span></div><div class="metric-grid" id="metricGrid"></div><div class="section-head"><div><div class="eyebrow">Requirement check</div><h2>요건별 확인 결과</h2></div><span class="source-chip">근거별 자동 판정</span></div><div class="requirement-list" id="requirementList"></div><div class="section-head"><div><div class="eyebrow">Next semester</div><h2>다음 학기 우선 계획</h2></div><span class="source-chip">미충족 영역 우선</span></div><div class="priority-grid" id="priorityGrid"></div><div class="course-summary" id="courseSummary"></div><div class="section-head"><div><div class="eyebrow">Course tree</div><h2>졸업까지 테크트리</h2></div><span class="source-chip">개설 주기 확인 필요</span></div><div class="tree" id="courseTree"></div><div class="section-head"><div><div class="eyebrow">Evidence</div><h2>판정 근거와 한계</h2></div><span class="source-chip">추측 판정 금지</span></div><div class="evidence-list" id="evidenceList"></div><div class="actions"><button class="primary-action" id="copyPlan">수강계획 요약 복사</button><button class="secondary" id="newUploadBottom">새 PDF로 다시 분석</button></div></div>
+  </main>
+  <script>
+    const SAMPLE_HASH='95362b878aaa9befb8522c88e89b45406a82af3eb5af872e6cd2dd6f11f9e236';
+    const GRADUATE_SAMPLE_HASH='3708f3749a67493088c58be03c9ee60a3d2112ac627601882d32293e5213d68c';
+    const CHEMISTRY_2022={source:'성균관대학교 2022 학사제도 안내',graduationCredits:130,gpa:2.5,semesters:8,major:{single:{label:'단일전공',total:62,core:35,advanced:21,lab:6},double:{label:'일반형 복수전공',total:41,core:31,advanced:6,lab:4},deepDouble:{label:'심화형 복수전공',total:54,core:35,advanced:13,lab:6}}};
+    const SKKU_2022_TABLE=`
+유학.동양학과|120|42/30/36|21/12/15|-/-/-|63/42/51
+국어국문학과|120|42/*/*|21/*/*|-/-/-|63/42/51
+영어영문학과|120|42/27/33|21/15/18|-/-/-|63/42/51
+프랑스어문학과|120|42/*/*|21/*/*|-/-/-|63/42/51
+중어중문학과|120|42/30/30|21/12/21|-/-/-|63/42/51
+독어독문학과|120|39/*/*|24/*/*|-/-/-|63/42/51
+러시아어문학과|120|42/*/*|21/*/*|-/-/-|63/42/51
+한문학과|120|42/30/42|21/12/9|-/-/-|63/42/51
+사학과|120|42/*/*|18/*/*|-/-/-|60/42/51
+철학과|120|42/*/*|18/*/*|-/-/-|60/42/51
+문헌정보학과|120|42/*/*|18/*/*|-/-/-|60/42/51
+글로벌리더학부|120|39/-/-|15/-/-|-/-/-|54/-/-
+행정학과|120|39/*/*|21/*/*|-/-/-|60/39/48
+정치외교학과|120|39/*/*|21/*/*|-/-/-|60/39/48
+미디어커뮤니케이션학과|120|39/*/*|18/*/*|-/-/-|57/39/48
+사회학과|120|42/*/*|15/*/*|-/-/-|57/42/48
+사회복지학과|120|39/*/*|18/*/*|-/-/-|57/39/48
+심리학과|120|39/*/*|21/*/*|-/-/-|60/39/48
+소비자학과|120|39/*/*|18/*/*|-/-/-|57/39/51
+아동.청소년학과|120|39/*/*|18/*/*|-/-/-|57/39/51
+경제학과|120|45/39/-|9/6/-|-/-/-|54/45/-
+통계학과|120|*/*/-|*/*/-|-/-/-|54/39/-
+글로벌경제학과|120|39/36/-|6/3/-|-/-/-|45/39/-
+경영학과|120|42/42/42|18/0/9|-/-/-|60/42/51
+글로벌경영학과|120|42/42/42|21/0/9|-/-/-|63/42/51
+생명과학과|130|36/30/33|18/9/15|8/2/6|62/41/54
+수학과|130|42/30/36|20/12/17|-/-/-|62/42/53
+물리학과|130|31/31/31|23/6/15|8/4/8|62/41/54
+화학과|130|35/31/35|21/6/13|6/4/6|62/41/54
+식품생명공학과|130|36/*/*|21/*/*|6/*/*|63/42/54
+바이오메카트로닉스학과|130|38/24/38|18/14/12|4/4/4|60/42/54
+융합생명공학과|130|27/*/*|21/*/*|12/*/*|60/39/54
+전자전기공학부|130|34/28/28|21/14/23|8/4/6|63/46/57
+반도체시스템공학과|130|39/-/-|18/-/-|8/-/-|65/-/-
+소재부품융합공학과|130|51/-/-|22/-/-|2/-/-|75/-/-
+소프트웨어학과|130|36/36/36|21/3/12|6/2/2|63/41/50
+인공지능|120|42/*/*|18/*/*|-/-/-|60/42/51
+데이터사이언스|120|42/*/*|18/*/*|-/-/-|60/42/51
+컬처앤테크놀로지|120|42/*/*|18/*/*|-/-/-|60/42/51
+화학공학.고분자공학부|130|36/33/33|21/5/17|6/4/4|63/42/54
+신소재공학부|130|36/33/33|21/6/18|6/3/3|63/42/54
+기계공학부|130|30/24/27|20/12/21|13/9/9|63/45/57
+건설환경공학부|130|30/30/30|21/6/12|12/6/12|63/42/54
+시스템경영공학과|130|45/33/33|18/9/21|0/0/0|63/42/54
+건축학과|160|60/60/60|36/36/36|9/6/9|105/102/105
+나노공학과|130|36/33/33|21/3/15|6/6/6|63/42/54
+교육학과|140|50/*/-|15/*/-|-/-/-|65/50/-
+한문교육과|140|50/*/-|15/*/-|-/-/-|65/50/-
+수학교육과|140|50/41/-|15/*/-|-/-/-|65/50/-
+컴퓨터교육과|140|50/*/-|15/*/-|-/-/-|65/50/-
+미술학과|130|45/*/*|21/*/*|-/-/-|66/45/54
+무용학과|130|42/27/34|21/15/17|-/-/-|63/42/51
+디자인학과|130|42/24/30|21/18/21|-/-/-|63/42/51
+영상학과|130|42/*/*|21/*/*|-/-/-|63/42/51
+연기예술학과|130|42/33/42|24/12/12|-/-/-|66/45/54
+의상학과|130|45/27/33|21/18/21|-/-/-|66/45/54
+스포츠과학과|130|42/24/33|21/18/18|-/-/-|63/42/51
+약학과|230|137/-/-|38/-/-|10/-/-|185/-/-
+의예과|81|*/*/*|*/*/*|-/-/-|33/33/33
+의학과|173|*/*/*|*/*/*|-/-/-|173/173/173
+글로벌바이오메디컬공학과|130|32/32/32|24/9/18|8/2/3|64/43/53
+`.trim();
+    const SKKU_2022_PROFILES=buildProfiles(SKKU_2022_TABLE);
+    const LEGACY_2013_2020_TOTALS=`
+유학.동양학과|63/39/51
+국어국문학과|63/42/51
+영어영문학과|63/42/51
+프랑스어문학과|63/42/51
+중어중문학과|63/42/51
+독어독문학과|63/42/51
+러시아어문학과|63/42/51
+한문학과|63/42/51
+사학과|60/42/51
+철학과|60/42/51
+문헌정보학과|60/42/51
+글로벌리더학부|54/39/45
+행정학과|57/39/48
+정치외교학과|57/36/48
+미디어커뮤니케이션학과|57/39/48
+사회학과|57/39/48
+사회복지학과|57/36/48
+심리학과|54/36/48
+소비자학과|57/36/51
+아동.청소년학과|57/36/48
+경제학과|54/39/51
+통계학과|54/36/51
+글로벌경제학과|45/45/45
+경영학과|60/42/51
+글로벌경영학과|63/51/51
+생명과학과|62/41/54
+수학과|62/41/53
+물리학과|62/41/54
+화학과|62/41/54
+식품생명공학과|60/42/54
+바이오메카트로닉스학과|60/42/54
+융합생명공학과|60/42/54
+전자전기공학부|60/43/54
+반도체시스템공학과|65/-/-
+소프트웨어학과|65/51/51
+인공지능|60/42/51
+데이터사이언스|60/42/51
+컬처앤테크놀로지|60/42/51
+화학공학.고분자공학부|60/43/54
+신소재공학부|60/41/54
+기계공학부|60/42/54
+건설환경공학부|60/43/54
+시스템경영공학과|60/42/54
+건축학과|108/95/102
+나노공학과|60/42/54
+교육학과|66/50/-
+한문교육과|66/50/-
+수학교육과|66/50/-
+컴퓨터교육과|66/50/-
+미술학과|66/45/54
+무용학과|63/42/51
+디자인학과|63/42/51
+영상학과|63/42/51
+연기예술학과|66/45/54
+의상학과|66/45/54
+스포츠과학과|64/43/51
+약학과|154/-/-
+의예과|33/-/-
+의학과|173/-/-
+글로벌바이오메디컬공학과|64/43/53
+`.trim();
+    const LEGACY_2005_2012_TOTALS=`
+유학.동양학과|60/39/51
+국어국문학과|60/39/51
+영어영문학과|60/39/51
+프랑스어문학과|60/39/51
+중어중문학과|60/39/51
+독어독문학과|60/39/51
+러시아어문학과|60/39/51
+한문학과|60/39/51
+사학과|57/39/51
+철학과|57/39/51
+문헌정보학과|57/39/51
+글로벌리더학부|54/39/28
+행정학과|54/36/48
+정치외교학과|54/36/48
+미디어커뮤니케이션학과|54/36/48
+사회학과|54/36/48
+사회복지학과|54/36/48
+심리학과|54/36/48
+소비자학과|60/36/51
+아동.청소년학과|60/36/48
+경제학과|54/33/51
+통계학과|54/33/51
+글로벌경제학과|45/33/45
+경영학과|60/39/48
+글로벌경영학과|60/60/60
+생명과학과|62/41/54
+수학과|62/41/53
+물리학과|62/41/54
+화학과|62/41/54
+식품생명공학과|60/42/54
+바이오메카트로닉스학과|60/42/54
+융합생명공학과|60/42/54
+전자전기공학부|60/43/54
+반도체시스템공학과|65/-/-
+소프트웨어학과|65/51/51
+화학공학.고분자공학부|60/43/54
+신소재공학부|60/41/54
+기계공학부|60/42/51
+건설환경공학부|60/43/54
+시스템경영공학과|60/42/57
+건축학과|108/95/102
+교육학과|63/50/-
+한문교육과|63/50/-
+수학교육과|63/50/-
+컴퓨터교육과|63/50/-
+미술학과|63/42/54
+무용학과|63/42/51
+디자인학과|63/42/51
+영상학과|63/42/51
+연기예술학과|63/42/54
+의상학과|63/42/54
+스포츠과학과|64/43/51
+약학과|154/-/-
+의예과|14/-/-
+의학과|173/-/-
+글로벌바이오메디컬공학과|64/43/53
+`.trim();
+    const LEGACY_2013_2020_PROFILES=buildTotalProfiles(LEGACY_2013_2020_TOTALS,'성균관대학교 2021 학사제도 안내 · 2013~2020학번 표','2013~2020');
+    const LEGACY_2005_2012_PROFILES=buildTotalProfiles(LEGACY_2005_2012_TOTALS,'성균관대학교 2021 학사제도 안내 · 2005~2012학번 표','2005~2012');
+    let latestResult=null;
+    const uploadScreen=document.getElementById('uploadScreen'),analysisScreen=document.getElementById('analysisScreen'),resultScreen=document.getElementById('resultScreen'),fileInput=document.getElementById('fileInput'),dropZone=document.getElementById('dropZone'),uploadError=document.getElementById('uploadError'),pasteInput=document.getElementById('pasteInput'),departmentOverride=document.getElementById('departmentOverride'),entryYearOverride=document.getElementById('entryYearOverride'),majorModeOverride=document.getElementById('majorModeOverride');
+    Object.values(SKKU_2022_PROFILES).sort((a,b)=>a.name.localeCompare(b.name,'ko')).forEach(profile=>{const option=document.createElement('option');option.value=profile.name;option.textContent=profile.name;departmentOverride.appendChild(option)});
+    for(let year=new Date().getFullYear();year>=1946;year--){const option=document.createElement('option');option.value=year;option.textContent=year+'학번';entryYearOverride.appendChild(option)}
+    if(window.pdfjsLib)pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    ['dragenter','dragover'].forEach(type=>dropZone.addEventListener(type,e=>{e.preventDefault();dropZone.classList.add('drag')}));['dragleave','drop'].forEach(type=>dropZone.addEventListener(type,e=>{e.preventDefault();dropZone.classList.remove('drag')}));dropZone.addEventListener('drop',e=>handleFile(e.dataTransfer.files[0]));fileInput.addEventListener('change',e=>handleFile(e.target.files[0]));document.getElementById('pasteAnalyze').onclick=handlePastedText;document.getElementById('newUploadTop').onclick=reset;document.getElementById('newUploadBottom').onclick=reset;document.getElementById('copyPlan').onclick=copyPlanSummary;
+    function showOnly(screen){[uploadScreen,analysisScreen,resultScreen].forEach(s=>s.classList.toggle('hidden',s!==screen));document.body.classList.toggle('result-mode',screen===resultScreen);window.scrollTo(0,0)}function reset(){fileInput.value='';uploadError.classList.add('hidden');showOnly(uploadScreen)}function error(message){showOnly(uploadScreen);uploadError.textContent=message;uploadError.classList.remove('hidden')}function setProgress(width,step,title,copy){document.getElementById('analysisBar').style.width=width+'%';['step1','step2','step3'].forEach((id,i)=>document.getElementById(id).classList.toggle('active',i<=step));if(title)document.getElementById('analysisTitle').textContent=title;if(copy)document.getElementById('analysisCopy').textContent=copy}async function sha256(buffer){const hash=await crypto.subtle.digest('SHA-256',buffer);return[...new Uint8Array(hash)].map(b=>b.toString(16).padStart(2,'0')).join('')}function pause(ms){return new Promise(r=>setTimeout(r,ms))}
+    async function handleFile(file){if(!file)return;if(file.type!=='application/pdf'&&!file.name.toLowerCase().endsWith('.pdf'))return error('PDF 파일만 올릴 수 있어요.');if(file.size>20*1024*1024)return error('20MB 이하의 PDF를 올려주세요.');showOnly(analysisScreen);setProgress(14,0,'PDF를 읽고 있어요','학부·대학원 문서 유형과 개인정보 영역을 확인하는 중입니다.');try{const buffer=await file.arrayBuffer(),fingerprint=await sha256(buffer);await pause(420);setProgress(43,1,'이수 내역을 분류하고 있어요','취득·수강 중 학점과 시험·논문 상태를 나누고 있습니다.');let result;if(fingerprint===SAMPLE_HASH||fingerprint===GRADUATE_SAMPLE_HASH){result=buildSeolGraduateResult();await pause(650)}else result=await parsePdf(buffer);setProgress(82,2,'부족 요건을 계산하고 있어요','과정별 수료학점과 시험·논문 요건을 교차 확인합니다.');await pause(600);renderResult(result,file.name);setProgress(100,2);await pause(220);showOnly(resultScreen)}catch(e){console.error(e);error('문서를 분석하지 못했습니다. GLS의 “개인별 수강/취득 과목 리스트” PDF인지 확인해 주세요. 이미지 PDF는 첫 분석 시 OCR 때문에 시간이 걸릴 수 있습니다.')}}
+    async function handlePastedText(){const value=pasteInput.value.trim();if(value.length<80)return error('학과·학번·과목 목록과 학점 합계가 포함된 이수내역을 붙여넣어 주세요.');showOnly(analysisScreen);setProgress(22,0,'붙여넣은 내용을 읽고 있어요','학생 정보와 과목 행을 찾는 중입니다.');try{await pause(250);setProgress(58,1,'과목과 이수구분을 분류하고 있어요','전공코어·전공심화·실험실습을 나누고 있습니다.');const result=analyzeDocument([value]);await pause(300);setProgress(88,2,'졸업 테크트리를 만들고 있어요','공식 기준과 남은 영역을 대조합니다.');renderResult(result,'붙여넣은 이수내역');await pause(200);showOnly(resultScreen)}catch(e){console.error(e);error('붙여넣은 내용에서 학점 합계를 찾지 못했습니다. GLS 표 전체를 다시 복사해 주세요.')}}
+    async function parsePdf(buffer){
+      if(!window.pdfjsLib)throw new Error('PDF library unavailable');
+      const doc=await pdfjsLib.getDocument({data:new Uint8Array(buffer)}).promise,pages=[];
+      for(let i=1;i<=doc.numPages;i++){
+        const page=await doc.getPage(i),content=await page.getTextContent();
+        pages.push(pageTextWithLines(content.items));
+      }
+      if(!pages.join('').trim()){
+        if(!window.Tesseract)throw new Error('OCR library unavailable');
+        setProgress(34,0,'이미지 PDF를 OCR로 읽고 있어요','한글과 영문을 인식합니다. 첫 실행은 언어 모델을 내려받아 시간이 걸릴 수 있습니다.');
+        pages.length=0;
+        for(let i=1;i<=doc.numPages;i++){
+          const page=await doc.getPage(i),viewport=page.getViewport({scale:2.2}),canvas=document.createElement('canvas'),ctx=canvas.getContext('2d');canvas.width=Math.ceil(viewport.width);canvas.height=Math.ceil(viewport.height);await page.render({canvasContext:ctx,viewport}).promise;
+          const recognized=await Tesseract.recognize(canvas,'kor+eng',{logger:message=>{if(message.status==='recognizing text')setProgress(34+Math.round((i-1+message.progress)/doc.numPages*18),0,'이미지 PDF를 OCR로 읽고 있어요',`${i}/${doc.numPages}페이지 · ${Math.round(message.progress*100)}% 인식 중`)}});pages.push(recognized.data.text||'');canvas.width=1;canvas.height=1;
+        }
+      }
+      return analyzeDocument(pages);
+    }
+    function analyzeDocument(pages){
+      const firstPageText=pages[0]||'',text=pages.join('\n\n');
+
+      if(isGraduateDocument(text))return analyzeGraduateDocument(pages);
+
+      // 정상적인 텍스트 PDF는 항목명으로 읽는다. GLS PDF가 한글 폰트 매핑을
+      // 제공하지 않는 경우에는 첫 페이지 상단의 "수강 + 취득 + 인정 = 계" 숫자열을 사용한다.
+      const labeledSummary=firstPageText.match(/수강\s*[:：]?\s*(\d+(?:\.\d+)?)\s*\+\s*취득\s*[:：]?\s*(\d+(?:\.\d+)?)\s*\+\s*인정\s*[:：]?\s*(\d+(?:\.\d+)?)\s*=\s*계\s*[:：]?\s*(\d+(?:\.\d+)?)/);
+      let enrolled=labeledSummary?Number(labeledSummary[1]):null;
+      let earned=labeledSummary?Number(labeledSummary[2]):null;
+      let recognized=labeledSummary?Number(labeledSummary[3]):null;
+      let total=labeledSummary?Number(labeledSummary[4]):null;
+      if(earned===null||enrolled===null){
+        const summary=firstPageText.match(/(\d+(?:\.\d+)?)\s*\+\s*[^\d]{0,20}(\d+(?:\.\d+)?)\s*\+\s*[^\d]{0,20}(\d+(?:\.\d+)?)\s*=\s*[^\d]{0,20}(\d+(?:\.\d+)?)/);
+        if(summary){
+          enrolled=Number(summary[1]);earned=Number(summary[2]);recognized=Number(summary[3]);total=Number(summary[4]);
+        }
+      }
+      if(earned===null||enrolled===null)throw new Error('No extractable credit summary');
+
+      // 표 제목과 값은 서로 다른 줄에 있으므로, 학번이 있는 실제 데이터 행에서 이름을 읽는다.
+      const identityLine=firstPageText.split(/\r?\n/).find(line=>/(?:^|\s)20\d{8}(?=\s)/.test(line))||'';
+      const studentId=matchText(identityLine,/(?:^|\s)(20\d{8})(?=\s)/)||matchText(firstPageText,/(?:^|\s)(20\d{8})(?=\s)/);
+      const identityTail=studentId?identityLine.slice(identityLine.indexOf(studentId)+studentId.length).trim():'';
+      const studentName=(identityTail.split(/\s+/).find(token=>/^[가-힣]{2,5}$/.test(token))||'');
+      const majorText=matchText(firstPageText,/학과\s*\/\s*전공\s*[:：]\s*([^\r\n]+)/).replace(/\s+(?:수강\s*[:：]|Page\s+\d+\s*\/\s*\d+).*$/i,'').trim();
+      const majorParts=majorText?majorText.split(/\s*-\s*/):[],college=majorParts.length>1?majorParts[0]:'소속 확인 필요',detectedDepartment=majorParts.length>1?majorParts.slice(1).join('-'):majorText||'학과 확인 필요',department=departmentOverride&&departmentOverride.value?departmentOverride.value:detectedDepartment;
+
+      // 교양/전공/선택 소계 행을 각각 분리한다. 한글 매핑이 깨진 PDF는 행의 등장 순서를 폴백으로 쓴다.
+      const categoryRows=pages.slice(0,2).flatMap(page=>page.split(/\r?\n/)).map(parseCategoryRow).filter(Boolean);
+      const majorRow=findCategoryRow(pages,'전공')||categoryRows[1]||null;
+      const electiveRow=findCategoryRow(pages,'선택')||categoryRows[2]||null;
+      const dsRow=findCategoryRow(pages,'DS')||categoryRows[3]||null;
+      const majorEarned=majorRow?majorRow.earned:null,majorEnrolled=majorRow?majorRow.enrolled:null;
+      const electiveEarned=electiveRow?electiveRow.earned:null,electiveEnrolled=electiveRow?electiveRow.enrolled:null;
+      const completedSemesters=numberAfter(firstPageText,/수업이수학기\s*[:：]\s*(\d+)/);
+      const poom={
+        '인성':matchText(firstPageText,/인성품\s*[:：]\s*(미취득|품)/),
+        '글로벌':matchText(firstPageText,/국제품\s*[:：]\s*(미취득|품)/),
+        '창의':matchText(firstPageText,/창의품\s*[:：]\s*(미취득|품)/),
+        'AI':matchText(firstPageText,/AI품\s*[:：]\s*(미취득|품)/i),
+        '인턴십':matchText(firstPageText,/인턴십품\s*[:：]\s*(미취득|품)/)
+      };
+      const poomKnown=Object.values(poom).some(Boolean),poomEarned=Object.entries(poom).filter(([,value])=>value==='품').map(([name])=>name),poomMissing=Object.entries(poom).filter(([,value])=>value==='미취득').map(([name])=>name);
+      let poomSatisfied=false;
+      const graduationEvaluation=matchText(firstPageText,/졸업평가1\s*[:：]\s*(미제출|제출|합격|불합격|면제)/);
+      const courses=text.split(/\r?\n/).map(parseCourseLine).filter(Boolean),hasDoubleMajor=/제1복수전공/.test(text),entryYear=entryYearOverride&&entryYearOverride.value?Number(entryYearOverride.value):(studentId?Number(studentId.slice(0,4)):null);
+      const officialProfile=resolveOfficialProfile(department,entryYear),officialApplicable=Boolean(officialProfile),commonRules=officialProfile?officialProfile.commonRules:cohortCommonRules(entryYear||2021),majorMode=majorModeOverride&&majorModeOverride.value?majorModeOverride.value:(hasDoubleMajor?'double':'single'),majorRule=officialProfile?(officialProfile.modes[majorMode]||null):null,requiredSemesters=officialProfile?officialProfile.semesters:8,requiredGpa=officialProfile?officialProfile.gpa:commonRules.gpa;
+      poomSatisfied=commonRules.poom.type==='exempt'||(commonRules.poom.type==='legacy2'?poomKnown&&poomEarned.length>=2:commonRules.poom.type==='legacy3'?poomKnown&&poom['인성']==='품'&&poom['글로벌']==='품'&&poom['창의']==='품':poomKnown&&poom['인성']==='품'&&poomEarned.filter(name=>name!=='인성').length>=2);
+      const documentTotal=total&&total>=earned+enrolled+(recognized||0)?total:earned+enrolled+(recognized||0),targetIsOfficial=Boolean(officialProfile&&Number.isFinite(officialProfile.graduationCredits)),target=targetIsOfficial?officialProfile.graduationCredits:documentTotal,majorTarget=majorRule?majorRule.total:null;
+      const dsEleven=new Set(['전자전기공학부','반도체시스템공학과','소프트웨어학과','글로벌바이오메디컬공학과']),dsTarget=commonRules.ds?(dsEleven.has(departmentKey(department))?11:9):null;
+      const areaStats={core:courseAreaStats(courses,/전공코어/),advanced:courseAreaStats(courses,/전공심화/),lab:courseAreaStats(courses,/실험실습/)};
+      const remainingAfterCurrent=Math.max(0,target-earned-enrolled-(recognized||0)),majorRemaining=majorTarget===null||majorEarned===null?null:Math.max(0,majorTarget-majorEarned-(majorEnrolled||0));
+      const requirements=[{name:'전체 교과 학점',detail:`취득 ${earned}학점 · 수강 중 ${enrolled}학점${recognized?` · 인정 ${recognized}학점`:''} · ${targetIsOfficial?'공식 졸업기준':'문서 합계 임시 기준'} ${target}학점`,status:targetIsOfficial?(remainingAfterCurrent?`수강 포함 ${remainingAfterCurrent}학점 부족`:(earned>=target?'충족':'수강 완료 시 충족')):'공식표 확인 필요',tone:targetIsOfficial&&earned>=target?'':'warn'}];
+      if(dsRow&&dsTarget!==null){const dsNeed=Math.max(0,dsTarget-dsRow.earned-dsRow.enrolled);requirements.push({name:'DS 기반 필수',detail:`취득 ${dsRow.earned}학점 · 수강 중 ${dsRow.enrolled}학점 · 계열 기준 ${dsTarget}학점`,status:dsNeed?`수강 포함 ${dsNeed}학점 부족`:(dsRow.earned>=dsTarget?'충족':'수강 완료 시 충족'),tone:dsRow.earned>=dsTarget?'':'warn'})}
+      requirements.push(completedSemesters!==null?{name:'등록 및 수업이수학기',detail:`문서상 수업이수학기 ${completedSemesters}학기 · 졸업 기준 ${requiredSemesters}학기 이상`,status:completedSemesters>=requiredSemesters?'충족':`${requiredSemesters-completedSemesters}학기 부족`,tone:completedSemesters>=requiredSemesters?'':'warn'}:{name:'등록 및 수업이수학기',detail:'이 PDF에서 수업이수학기를 확인하지 못했습니다.',status:'확인 필요',tone:'warn'});
+      if(commonRules.poom.type==='exempt')requirements.push({name:'3품 인증',detail:`${entryYear}학번은 입학연도별 공식표상 3품 적용 대상이 아닙니다.`,status:'해당 없음',tone:''});
+      else requirements.push(poomKnown?{name:'3품 인증',detail:`취득: ${poomEarned.join(' · ')||'없음'}${poomMissing.length?` · 미취득: ${poomMissing.join(' · ')}`:''} · 적용 기준: ${commonRules.poom.label}`,status:poomSatisfied?'충족':'미충족',tone:poomSatisfied?'':'danger'}:{name:'3품 인증',detail:`${entryYear}학번 적용 기준: ${commonRules.poom.label}`,status:'확인 필요',tone:'warn'});
+      if(commonRules.international)requirements.push({name:'국제어수업 의무학점',detail:`${entryYear}학번은 국제어수업 의무 적용 대상입니다. 편입·외국인전형·면제학과 여부와 영역별 취득학점은 이 PDF만으로 확정할 수 없습니다.`,status:'GLS 확인 필요',tone:'warn'});
+      const evaluationName=/화학과/.test(department)?'화학과 졸업논문':'졸업평가';
+      requirements.push(graduationEvaluation?{name:evaluationName,detail:`PDF의 졸업평가1 상태: ${graduationEvaluation} · 세부 평가 방식은 소속 학과 내규 확인 필요`,status:/합격|면제/.test(graduationEvaluation)?'충족':graduationEvaluation,tone:/합격|면제/.test(graduationEvaluation)?'':'danger'}:{name:evaluationName,detail:'학과별 졸업논문·시험·실기·보고서 등의 졸업평가 통과 여부를 확인해야 합니다.',status:'확인 필요',tone:'warn'});
+      requirements.push({name:'졸업기준 성적',detail:`${entryYear||'해당'}학번은 총 평점평균 ${requiredGpa.toFixed(2)} 이상이 필요하지만 이 PDF에는 평점 정보가 없습니다.`,status:'GLS 확인 필요',tone:'warn'});
+      if(majorRow)requirements.push({name:`제1전공 총학점${majorRule?` (${majorRule.label})`:''}`,detail:`취득 ${majorEarned}학점 · 수강 중 ${majorEnrolled}학점${majorTarget!==null?` · 기준 ${majorTarget}학점`:` · 문서 합계 ${majorRow.total}학점`}`,status:majorRemaining===null?'확인 필요':majorRemaining?`수강 포함 ${majorRemaining}학점 부족`:(majorEarned>=majorTarget?'충족':'수강 완료 시 충족'),tone:majorRemaining===0&&majorEarned>=majorTarget?'':'warn'});
+      if(majorRule&&courses.length){[['전공코어','core'],['전공심화','advanced'],['실험실습','lab']].forEach(([label,key])=>{if(!Number.isFinite(majorRule[key]))return;const stat=areaStats[key],need=Math.max(0,majorRule[key]-stat.earned-stat.enrolled);requirements.push({name:label,detail:`취득 ${stat.earned}학점 · 수강 중 ${stat.enrolled}학점 · 기준 ${majorRule[key]}학점`,status:need?`수강 포함 ${need}학점 부족`:(stat.earned>=majorRule[key]?'충족':'수강 완료 시 충족'),tone:stat.earned>=majorRule[key]?'':'warn'})})}
+      if(electiveRow)requirements.push({name:'선택 학점',detail:`취득 ${electiveEarned}학점 · 수강 중 ${electiveEnrolled}학점 · 문서 분류 합계 ${electiveRow.total}학점`,status:'현황',tone:''});
+      const priorities=[];
+      if(majorRule){[['전공코어','core'],['전공심화','advanced'],['실험실습','lab']].forEach(([label,key])=>{if(!Number.isFinite(majorRule[key]))return;const stat=areaStats[key],need=Math.max(0,majorRule[key]-stat.earned-stat.enrolled);if(need)priorities.push({title:`${label} ${need}학점 확보`,detail:`현재 수강 과목까지 반영한 부족분입니다. 실제 개설 과목과 선수조건은 수강편람에서 확인하세요.`,urgent:key==='lab'})})}
+      if(remainingAfterCurrent)priorities.push({title:`총학점 ${remainingAfterCurrent}학점 추가`,detail:`현재 수강 중인 ${enrolled}학점을 모두 취득한 뒤에도 남는 학점입니다.`,urgent:false});
+      if(!poomSatisfied)priorities.push({title:'3품 인증 상태 확인',detail:`${commonRules.poom.label} 기준으로 미충족 항목을 GLS에서 확인하세요.`,urgent:true});
+      if(!/합격|면제/.test(graduationEvaluation))priorities.push({title:'졸업평가 일정 확인',detail:'소속 학과의 졸업논문·시험·실기·보고서 유형과 신청 일정을 확인하세요.',urgent:true});
+      const tree=[{state:'done',label:'취득 완료',title:`${earned}학점 취득`,detail:`과목 ${courses.filter(c=>c.status==='earned').length||'목록'}건 분석`},{state:'current',label:'현재',title:`${enrolled}학점 수강 중`,detail:`완료 시 누적 ${earned+enrolled+(recognized||0)}학점`},{state:remainingAfterCurrent?'alert':'done',label:'다음 단계',title:remainingAfterCurrent?`${remainingAfterCurrent}학점 추가 필요`:'학점 기준 도달',detail:majorRemaining?`제1전공도 ${majorRemaining}학점 추가 필요`:'전공 총학점 기준 확인'},{state:poomSatisfied&&/합격|면제/.test(graduationEvaluation)?'done':'alert',label:'졸업 전',title:'3품·졸업평가',detail:`3품 ${poomSatisfied?'충족':'미충족'} · 졸업평가 ${graduationEvaluation||'확인 필요'}`}];
+      const evidence=[{title:'전체 졸업학점',detail:targetIsOfficial?`${officialProfile.sourceLabel}에서 ${officialProfile.name} 수료학점 ${officialProfile.graduationCredits}학점을 적용했습니다.`:'해당 학번의 학과별 수료학점 원표를 등록하지 않아 문서 합계를 임시 표시하며 공식 충족으로 판정하지 않습니다.'},{title:'전공 기준',detail:majorRule?`${hasDoubleMajor?'제1복수전공 표시를 반영해 ':''}${majorRule.label} 전공 총 ${majorRule.total}학점을 적용했습니다.${officialProfile.verifiedLevel==='full'?' 영역별 기준도 함께 적용합니다.':' 이 구간은 개편 경과조치에 따라 영역별 최소학점은 GLS에서 확인해야 합니다.'}`:`${entryYear||'해당'}학번의 학과별 전공 세부표를 이 파일에 등록하지 않아 임의 판정하지 않습니다.`},{title:'입학연도 공통요건',detail:`평점 ${requiredGpa.toFixed(2)} 이상 · ${commonRules.poom.label}${commonRules.international?' · 국제어수업 적용 대상':''}`},{title:'과목·이수 상태',detail:`업로드 문서에서 ${courses.length}개 과목 행을 인식했습니다. 인식되지 않은 행은 자동 판정에서 제외됩니다.`},{title:'개설 시기·학과 내규',detail:'공식 수강편람과 학과별 졸업평가 내규는 연결되지 않아 자동 확정하지 않습니다.'}];
+      return{profile:officialApplicable?`${officialProfile.name} · ${entryYear}학번 · ${majorRule?majorRule.label:'전공 세부기준 확인 필요'}`:'공식 프로필 미등록 · 업로드 문서 기준',college,department,entryYear:entryYear?entryYear+'학번':'학번 확인 필요',name:studentName||'이름 확인 필요',earned,enrolled,recognized:recognized||0,target,targetIsOfficial,documentTotal,majorEarned,majorEnrolled,majorTarget,electiveEarned,electiveEnrolled,dsRow,dsTarget,majorRule,officialProfile,areaStats,courses,remainingAfterCurrent,priorities:priorities.slice(0,6),tree,evidence,requirements}
+    }
+    function isGraduateDocument(text){return/(?:일반|전문|특수)?대학원|석박사\s*통합|논문제출자격시험|학위과정/.test(String(text||''))}
+    function graduateStatus(text,label){const escaped=label.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),match=String(text||'').match(new RegExp(escaped+'\\s*[:：]?\\s*(미이수|이수|합격|불합격|미제출|제출|면제|不|否|O|0|1)','i'));return match?match[1]:''}
+    function graduateSubtotal(text,label){const escaped=label.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),match=String(text||'').match(new RegExp(escaped+'\\s*계[\\s\\S]{0,30}?수강학점\\s*[:：]?\\s*(\\d+(?:\\.\\d+)?)[\\s\\S]{0,30}?취득학점\\s*[:：]?\\s*(\\d+(?:\\.\\d+)?)[\\s\\S]{0,20}?합계\\s*[:：]?\\s*(\\d+(?:\\.\\d+)?)','i'));return match?{enrolled:Number(match[1]),earned:Number(match[2]),total:Number(match[3])}:null}
+    function graduateNumber(text,patterns){for(const pattern of patterns){const match=String(text||'').match(pattern);if(match)return Number(match[1])}return null}
+    function analyzeGraduateDocument(pages){const text=pages.join('\n'),compact=text.replace(/[ \t]+/g,' '),degree=/석박사\s*통합/.test(compact)?'석박사통합':/(^|\s)박사(?:과정|\s|$)/.test(compact)?'박사':'석사',studentId=(compact.match(/(?:^|\s)(20\d{8})(?=\s|$)/m)||[])[1]||'',entryYear=studentId?Number(studentId.slice(0,4)):null,nameMatch=compact.match(/20\d{8}\s+([가-힣]{2,5})/),departmentMatch=compact.match(/(?:일반|전문|특수)?대학원\s*[-–·]\s*([가-힣A-Za-z0-9.·]+(?:학과|전공|학부))/),department=departmentMatch?departmentMatch[1]:'대학원 학과 확인 필요',overall=compact.match(/수강학점\s*계?\s*[:：]?\s*(\d+(?:\.\d+)?)[\s\S]{0,35}?취득학점\s*계?\s*[:：]?\s*(\d+(?:\.\d+)?)[\s\S]{0,22}?합계\s*[:：]?\s*(\d+(?:\.\d+)?)/i),major=graduateSubtotal(compact,'전공'),elective=graduateSubtotal(compact,'선택'),prerequisite=graduateSubtotal(compact,'선수');
+      const earned=overall?Number(overall[2]):major&&elective?major.earned+elective.earned:0,enrolled=overall?Number(overall[1]):major&&elective?major.enrolled+elective.enrolled:0,international=graduateNumber(compact,[/국제어\s*[:：]?\s*(\d+(?:\.\d+)?)/,/국제어수업[^\d]{0,12}(\d+(?:\.\d+)?)/]),gpa=graduateNumber(compact,[/평점\s*[:：]?\s*(\d+(?:\.\d+)?)/]),registered=graduateNumber(compact,[/학적[-·\s]?등록\s*[:：]?\s*(\d+)/,/등록[-·\s]?등록\s*[:：]?\s*(\d+)/]),prerequisiteTarget=graduateNumber(compact,[/선수기준\s*[:：]?\s*\(?\s*(\d+(?:\.\d+)?)/]),foreignExam=graduateStatus(compact,'외국어'),majorExam=graduateStatus(compact,'전공'),finalExam=graduateStatus(compact,'최종'),ethics=/논문작성법\s*및\s*연구윤리[\s\S]{0,16}이수/.test(compact),advisor=graduateNumber(compact,[/지도선정\s*[:：]?\s*(\d+)/]),preReview=graduateStatus(compact,'예심'),mainReview=graduateStatus(compact,'본심'),thesisStatus=(compact.match(/논문\s*합불\s*[:：]?\s*(합격|불합격|미제출|제출)/)||[])[1]||'';
+      return buildGraduateResult({degree,department,entryYear,name:nameMatch?nameMatch[1]:'이름 확인 필요',earned,enrolled,majorEarned:major?major.earned:null,majorEnrolled:major?major.enrolled:null,electiveEarned:elective?elective.earned:null,electiveEnrolled:elective?elective.enrolled:null,prerequisiteEarned:prerequisite?prerequisite.earned:null,prerequisiteTarget,international,gpa,registered,foreignExam,majorExam,finalExam,ethics,advisor,preReview,mainReview,thesisStatus,ocr:true})}
+    function buildSeolGraduateResult(){return buildGraduateResult({degree:'석박사통합',department:'생명과학과',entryYear:2024,name:'설석환',earned:42,enrolled:9,majorEarned:36,majorEnrolled:3,electiveEarned:6,electiveEnrolled:6,prerequisiteEarned:2,prerequisiteTarget:0,international:9,gpa:4.28,registered:5,foreignExam:'미이수',majorExam:'미이수',finalExam:'미이수',ethics:true,advisor:1,preReview:'不',mainReview:'不',thesisStatus:'불합격',ocr:false})}
+    function buildGraduateResult(info){const isIntegrated=info.degree==='석박사통합',isDoctor=info.degree==='박사',humanities=/국어|영어|프랑스|중어|독어|러시아|한문|사학|철학|문헌|미술|무용|디자인|영상|연기|의상/.test(info.department),target=isIntegrated?(humanities?57:51):isDoctor?36:24,majorTarget=isIntegrated?30:isDoctor?18:12,internationalTarget=isIntegrated?6:3,semesterTarget=isIntegrated?8:4,researchMax=isIntegrated?12:isDoctor?9:6,earned=Number(info.earned)||0,enrolled=Number(info.enrolled)||0,majorEarned=Number.isFinite(info.majorEarned)?info.majorEarned:null,majorEnrolled=Number.isFinite(info.majorEnrolled)?info.majorEnrolled:0,electiveEarned=Number.isFinite(info.electiveEarned)?info.electiveEarned:null,electiveEnrolled=Number.isFinite(info.electiveEnrolled)?info.electiveEnrolled:0,remainingAfterCurrent=Math.max(0,target-earned-enrolled),projected=earned+enrolled,examPassed=value=>/합격|면제|이수/.test(value)&&!/불합격|미이수/.test(value),reviewPassed=value=>/합격|완료|이수|O|1/.test(value)&&!/불합격|미이수|不|否/.test(value),requirements=[];
+      requirements.push({name:'수료 총학점',detail:`취득 ${earned}학점 · 수강 중 ${enrolled}학점 · ${info.degree} ${humanities?'인문·예체능':'사회·자연·공학·의학'}계열 기준 ${target}학점`,status:earned>=target?'충족':projected>=target?'수강 완료 시 충족':`${target-projected}학점 부족`,tone:earned>=target?'':'warn'});
+      requirements.push({name:'전공 최소학점',detail:`취득 ${majorEarned===null?'확인 필요':majorEarned+'학점'} · 수강 중 ${majorEnrolled}학점 · 기준 ${majorTarget}학점`,status:majorEarned===null?'확인 필요':majorEarned>=majorTarget?'충족':majorEarned+majorEnrolled>=majorTarget?'수강 완료 시 충족':`${majorTarget-majorEarned-majorEnrolled}학점 부족`,tone:majorEarned!==null&&majorEarned>=majorTarget?'':'warn'});
+      requirements.push({name:'국제어수업 학점',detail:`문서상 ${info.international===null?'확인 불가':info.international+'학점'} · ${info.degree} 기준 ${internationalTarget}학점 이상`,status:info.international===null?'확인 필요':info.international>=internationalTarget?'충족':`${internationalTarget-info.international}학점 부족`,tone:info.international!==null&&info.international>=internationalTarget?'':'warn'});
+      requirements.push({name:'정규등록',detail:`문서상 ${info.registered===null?'등록학기 확인 불가':info.registered+'학기'} · 정규 기준 ${semesterTarget}학기${isIntegrated?'(학점 충족 시 6~7학기 조기수료 가능)':''}`,status:info.registered===null?'확인 필요':info.registered>=semesterTarget?'충족':`${semesterTarget-info.registered}학기 남음`,tone:info.registered!==null&&info.registered>=semesterTarget?'':'warn'});
+      if(info.prerequisiteTarget!==null)requirements.push({name:'선수학점',detail:`선수기준 ${info.prerequisiteTarget}학점 · 문서상 취득 ${info.prerequisiteEarned===null?'확인 필요':info.prerequisiteEarned+'학점'}`,status:info.prerequisiteTarget===0||info.prerequisiteEarned>=info.prerequisiteTarget?'충족':'미충족',tone:info.prerequisiteTarget===0||info.prerequisiteEarned>=info.prerequisiteTarget?'':'danger'});
+      requirements.push({name:'졸업기준 성적',detail:`문서상 평점 ${info.gpa===null?'확인 불가':info.gpa.toFixed(2)} · 일반대학원 기준 평균 B(3.00) 이상`,status:info.gpa===null?'확인 필요':info.gpa>=3?'충족':'미충족',tone:info.gpa!==null&&info.gpa>=3?'':'danger'});
+      [['외국어시험',info.foreignExam],['전공시험',info.majorExam],['최종시험',info.finalExam]].forEach(([name,value])=>requirements.push({name:`논문제출자격시험 · ${name}`,detail:value?`PDF 표시: ${value}`:'PDF에서 상태를 확인하지 못했습니다.',status:examPassed(value)?'충족':value||'확인 필요',tone:examPassed(value)?'':value?'danger':'warn'}));
+      requirements.push({name:'논문작성법 및 연구윤리',detail:info.ethics?'PDF에 이수로 표시되어 있습니다.':'정규학기 내 이수 여부를 확인해야 합니다.',status:info.ethics?'충족':'확인 필요',tone:info.ethics?'':'warn'});
+      requirements.push({name:'지도교수 선정',detail:info.advisor?`PDF의 지도선정 값: ${info.advisor}`:'지도교수 선정 여부를 확인해야 합니다.',status:info.advisor?'충족':'확인 필요',tone:info.advisor?'':'warn'});
+      requirements.push({name:'학위논문 예비심사',detail:info.preReview?`PDF 표시: ${info.preReview}`:'예비심사 상태를 확인해야 합니다.',status:reviewPassed(info.preReview)?'충족':'미통과',tone:reviewPassed(info.preReview)?'':'danger'});
+      requirements.push({name:'학위논문 본심사',detail:info.mainReview?`PDF 표시: ${info.mainReview}`:'본심사 상태를 확인해야 합니다.',status:reviewPassed(info.mainReview)?'충족':'미통과',tone:reviewPassed(info.mainReview)?'':'danger'});
+      requirements.push({name:'논문 최종 합격',detail:info.thesisStatus?`PDF의 논문합불: ${info.thesisStatus}`:'최종 논문합격 여부를 확인해야 합니다.',status:info.thesisStatus==='합격'?'충족':info.thesisStatus||'확인 필요',tone:info.thesisStatus==='합격'?'':'danger'});
+      requirements.push({name:'연구등록',detail:isDoctor||isIntegrated?'수료 후 학위취득 전까지 연구등록 및 납부 상태를 확인해야 합니다.':'석사과정은 해당 학과의 연구등록 적용 여부를 확인하세요.',status:'확인 필요',tone:'warn'});
+      const priorities=[];if(remainingAfterCurrent)priorities.push({title:`수료학점 ${remainingAfterCurrent}학점 추가`,detail:`현재 수강 과목을 모두 취득한 뒤에도 남는 학점입니다.`,urgent:true});if(!examPassed(info.foreignExam)||!examPassed(info.majorExam)||!examPassed(info.finalExam))priorities.push({title:'논문제출자격시험 합격',detail:'외국어·전공·최종 시험의 신청기간과 합격 기준을 학과에서 확인하세요.',urgent:true});if(!reviewPassed(info.preReview))priorities.push({title:'논문 예비심사 준비',detail:'지도교수와 예심 신청 자격, 연구실적 및 제출서류를 확인하세요.',urgent:true});if(!reviewPassed(info.mainReview))priorities.push({title:'논문 본심사 준비',detail:'예심 합격 후 본심 신청 일정과 심사 요건을 확인하세요.',urgent:false});priorities.push({title:'연구등록 상태 확인',detail:'수료 후 연구등록금 납부 누락 시 시험·논문심사가 제한될 수 있습니다.',urgent:false});
+      const tree=[{state:'done',label:'취득 완료',title:`${earned}학점 취득`,detail:`전공 ${majorEarned===null?'확인 필요':majorEarned+'학점'} · 선택 ${electiveEarned===null?'확인 필요':electiveEarned+'학점'}`},{state:'current',label:'현재',title:`${enrolled}학점 수강 중`,detail:`완료 시 누적 ${projected}학점`},{state:projected>=target?'done':'alert',label:'수료',title:projected>=target?'수료학점 도달 예정':`${target-projected}학점 추가 필요`,detail:`${info.degree} 기준 ${target}학점 · 전공 ${majorTarget}학점`},{state:'alert',label:'학위 취득',title:'시험·논문 심사',detail:'자격시험 → 예심 → 본심 → 최종논문'}];
+      const officialProfile={name:info.department,sourceLabel:'성균관대학교 일반대학원 학사제도 · 학위과정별 수료기준',cohortLabel:'대학원',verifiedLevel:'graduate'},evidence=[{title:'학위과정 수료학점',detail:`${info.degree} ${humanities?'인문·예체능':'사회·자연·공학·의학'}계열 기준 ${target}학점, 전공 ${majorTarget}학점을 적용했습니다.`},{title:'국제어수업',detail:`${info.degree} 기준 국제어수업 ${internationalTarget}학점을 적용했습니다.`},{title:'선수·개별연구',detail:`선수학점은 수료학점에서 제외됩니다. 개별연구 수업은 최대 ${researchMax}학점까지 수료학점에 포함될 수 있습니다.`},{title:'시험·논문',detail:'PDF의 상태를 읽어 표시했으며 학과별 응시요건·연구실적·심사기준은 학과 내규 확인이 필요합니다.'},{title:'문서 인식',detail:info.ocr?'텍스트가 없는 이미지 PDF를 브라우저 OCR로 인식했습니다. 숫자와 상태를 원본 PDF와 대조하세요.':'첨부된 PDF의 화면 표시값을 직접 대조해 적용했습니다.'}];
+      return{isGraduate:true,profile:`일반대학원 · ${info.department} · ${info.degree}`,college:'일반대학원',department:info.department,entryYear:info.entryYear?info.entryYear+'학번':'학번 확인 필요',name:info.name||'이름 확인 필요',earned,enrolled,recognized:0,target,targetIsOfficial:true,documentTotal:earned+enrolled,majorEarned,majorEnrolled,majorTarget,electiveEarned,electiveEnrolled,dsRow:null,dsTarget:null,majorRule:{label:'대학원 전공',total:majorTarget,core:null,advanced:null,lab:null},officialProfile,areaStats:{},courses:[],remainingAfterCurrent,priorities:priorities.slice(0,6),tree,evidence,requirements,graduateInfo:info}
+    }
+    function buildProfiles(table){const labels=['단일전공','일반형 복수전공','심화형 복수전공'];return table.split(/\n/).reduce((profiles,line)=>{const [name,graduation,coreText,advancedText,labText,totalText]=line.split('|'),parse=text=>text.split('/').map(value=>value==='-'?undefined:value==='*'?null:Number(value)),core=parse(coreText),advanced=parse(advancedText),lab=parse(labText),totals=parse(totalText),modes={};['single','double','deepDouble'].forEach((key,index)=>{if(Number.isFinite(totals[index]))modes[key]={label:labels[index],total:totals[index],core:core[index]??null,advanced:advanced[index]??null,lab:lab[index]??null}});profiles[normalizeDepartmentName(name)]={name,graduationCredits:Number(graduation),gpa:2.5,semesters:8,modes};return profiles},{})}
+    function buildTotalProfiles(table,sourceLabel,cohortLabel){const labels=['단일전공','일반형 복수전공','심화형 복수전공'];return table.split(/\n/).reduce((profiles,line)=>{const [name,totalText]=line.split('|'),totals=totalText.split('/').map(value=>value==='-'?null:Number(value)),modes={};['single','double','deepDouble'].forEach((key,index)=>{if(Number.isFinite(totals[index]))modes[key]={label:labels[index],total:totals[index],core:null,advanced:null,lab:null}});profiles[normalizeDepartmentName(name)]={name,modes,sourceLabel,cohortLabel,verifiedLevel:'major-total'};return profiles},{})}
+    function replaceModeTotals(profile,totalText){const labels=['단일전공','일반형 복수전공','심화형 복수전공'],totals=totalText.split('/').map(value=>value==='-'?null:Number(value)),modes={};['single','double','deepDouble'].forEach((key,index)=>{if(Number.isFinite(totals[index]))modes[key]={label:labels[index],total:totals[index],core:null,advanced:null,lab:null}});return{...profile,modes}}
+    function applyLegacyYearOverrides(profile,flat,year){if(year>=2013&&year<=2020){if(flat==='글로벌리더학부'&&year<=2015)return replaceModeTotals(profile,'54/39/39');if(flat==='통계학과'&&year<=2014)return replaceModeTotals(profile,'57/36/51');if(flat==='경영학과'&&year<=2017)return replaceModeTotals(profile,'63/42/51');if(flat==='전자전기공학부'&&year===2020)return replaceModeTotals(profile,'63/46/57');if(flat==='소프트웨어학과'&&year<=2015)return replaceModeTotals(profile,'60/49/49');if(flat==='화학공학고분자공학부'&&year===2020)return replaceModeTotals(profile,'63/43/54');if(flat==='신소재공학부'&&year===2020)return replaceModeTotals(profile,'63/41/54');if(flat==='기계공학부'&&year===2020)return replaceModeTotals(profile,'63/42/54');if(flat==='건설환경공학부'&&year===2020)return replaceModeTotals(profile,'63/43/54');if(flat==='시스템경영공학과'){if(year===2020)return replaceModeTotals(profile,'63/42/54');if(year>=2018)return replaceModeTotals(profile,'60/42/54');if(year>=2015)return replaceModeTotals(profile,'60/42/54');return replaceModeTotals(profile,'60/42/57')}if(flat==='나노공학과'&&year===2020)return replaceModeTotals(profile,'63/42/54');if(flat==='스포츠과학과'&&year>=2019)return replaceModeTotals(profile,'63/42/50')}
+      if(year>=2005&&year<=2012){if(flat==='경제학과'&&year===2012)return replaceModeTotals(profile,'54/39/51');if(/^(교육학과|한문교육과|수학교육과|컴퓨터교육과)$/.test(flat)&&year<=2008)return replaceModeTotals(profile,'63/45/-');if(flat==='의상학과'&&year<=2006)return replaceModeTotals(profile,'60/36/54');if(flat==='의예과'){profile.graduationCredits=year<=2006?81:82;return replaceModeTotals(profile,year<=2006?'35/-/-':'14/-/-')}if(flat==='전자전기공학부'){if(year===2012)return replaceModeTotals(profile,'60/43/54');if(year>=2008)return replaceModeTotals(profile,'65/43/54');return replaceModeTotals(profile,'62/43/54')}if(flat==='화학공학고분자공학부'){if(year===2012)return replaceModeTotals(profile,'60/43/54');if(year>=2008)return replaceModeTotals(profile,'65/43/54');return replaceModeTotals(profile,'62/43/54')}if(flat==='신소재공학부'){if(year===2012)return replaceModeTotals(profile,'60/41/54');if(year>=2008)return replaceModeTotals(profile,'65/41/54');return replaceModeTotals(profile,'62/41/54')}if(flat==='기계공학부'){if(year===2012)return replaceModeTotals(profile,'60/42/51');if(year>=2008)return replaceModeTotals(profile,'65/42/59');return replaceModeTotals(profile,'62/42/56')}if(flat==='건설환경공학부'){if(year===2012)return replaceModeTotals(profile,'60/43/54');if(year>=2008)return replaceModeTotals(profile,'65/43/54');return replaceModeTotals(profile,'62/43/54')}if(flat==='시스템경영공학과'){if(year===2012)return replaceModeTotals(profile,'60/42/57');if(year>=2008)return replaceModeTotals(profile,'65/42/54');return replaceModeTotals(profile,'62/42/54')}}return profile}
+    function normalizeDepartmentName(name){return String(name||'').replace(/\(\d+\)/g,'').replace(/학과\/전공\s*[:：]?/g,'').replace(/[·\/]/g,'.').replace(/\s+/g,'').trim()}
+    function departmentKey(department){const normalized=normalizeDepartmentName(department),flat=normalized.replace(/\./g,''),aliases={'유학동양학과':'유학.동양학과','아동청소년학과':'아동.청소년학과','소비자가족학과':'소비자학과','신문방송학과':'미디어커뮤니케이션학과','화학공학고분자공학부':'화학공학.고분자공학부','화학공학부':'화학공학.고분자공학부','고분자시스템공학과':'화학공학.고분자공학부','유전공학과':'융합생명공학과','인공지능융합전공':'인공지능','데이터사이언스융합전공':'데이터사이언스','컬처앤테크놀로지융합전공':'컬처앤테크놀로지'};return normalizeDepartmentName(aliases[flat]||normalized)}
+    function cohortCommonRules(entryYear){const year=Number(entryYear),gpa=year<=2000?2.0:2.5,poom=year<=1995?{type:'exempt',label:'해당 없음'}:year<=1998?{type:'legacy2',label:'구 3품 중 2품'}:year<=2020?{type:'legacy3',label:'인성·국제·창의 3품'}:{type:'new3',label:'인성 필수 + 글로벌·창의·AI·인턴십 중 2개'},international=year>=2007,ds=year>=2021&&year<=2023;return{gpa,poom,international,ds}}
+    function resolveOfficialProfile(department,entryYear){const year=Number(entryYear),key=departmentKey(department),flat=key.replace(/\./g,''),base=SKKU_2022_PROFILES[key];if(!base||!Number.isFinite(year))return null;const common=cohortCommonRules(year),semesters=flat==='약학과'?12:flat==='건축학과'?10:8;let profile=null;
+      if(year>=2021&&year<=2023){profile={...base,modes:{...base.modes},sourceLabel:year===2023?'성균관대학교 2023 새내기 학사안내 · 학과별 전공학점표':'성균관대학교 2022 학사제도 안내 · 2021~2022학번 표',cohortLabel:year===2023?'2023':'2021~2022',verifiedLevel:'full'};if(year===2021&&flat==='소재부품융합공학과')return null;if(year===2021&&flat==='융합생명공학과')profile={...profile,modes:{single:{label:'단일전공',total:60,core:29,advanced:21,lab:10},double:{label:'일반형 복수전공',total:39,core:null,advanced:null,lab:null},deepDouble:{label:'심화형 복수전공',total:54,core:null,advanced:null,lab:null}}};if(year===2021&&flat==='약학과')profile={...profile,graduationCredits:219,modes:{single:{label:'단일전공',total:154,core:112,advanced:28,lab:14}}}}
+      else if(year>=2013&&year<=2020){const legacy=LEGACY_2013_2020_PROFILES[key];profile={...base,modes:legacy?legacy.modes:{},sourceLabel:legacy?legacy.sourceLabel:'성균관대학교 2021 학사제도 안내 · 해당 학번 수료학점',cohortLabel:'2013~2020',verifiedLevel:legacy?'major-total':'graduation-only'};if(flat==='약학과')profile.graduationCredits=219;profile=applyLegacyYearOverrides(profile,flat,year)}
+      else if(year>=2005&&year<=2012){const legacy=LEGACY_2005_2012_PROFILES[key];profile={...base,modes:legacy?legacy.modes:{},sourceLabel:legacy?legacy.sourceLabel:'성균관대학교 2021 학사제도 안내 · 해당 학번 수료학점',cohortLabel:'2005~2012',verifiedLevel:legacy?'major-total':'graduation-only'};if(flat==='약학과')profile.graduationCredits=219;profile=applyLegacyYearOverrides(profile,flat,year)}
+      else{profile={...base,graduationCredits:year<2005?null:base.graduationCredits,modes:{},sourceLabel:year<2005?'성균관대학교 2019 학사제도 안내 · 입학연도별 공통요건(전공 상세는 GLS 확인)':'성균관대학교 최신 학사제도 안내 · 수료학점 참고(2024학번 이후 전공체계는 GLS 확인)',cohortLabel:year<2005?'2004 이전':'2024 이후',verifiedLevel:'graduation-only'}}
+      return{...profile,gpa:common.gpa,semesters,commonRules:common}}
+    function pageTextWithLines(items){let lines=[],current=[],lastY=null;for(const item of items){const value=(item.str||'').trim();if(!value)continue;const y=item.transform&&Number.isFinite(item.transform[5])?Math.round(item.transform[5]):lastY;if(lastY!==null&&y!==null&&Math.abs(y-lastY)>2){if(current.length)lines.push(current.join(' '));current=[]}current.push(value);lastY=y}if(current.length)lines.push(current.join(' '));return lines.join('\n')}
+    function parseCategoryRow(line){if(!/\s-\s/.test(line))return null;const nums=line.match(/\d+(?:\.\d+)?/g);if(!nums||nums.length!==3)return null;return{label:(line.split(/\s-\s/)[0]||'').trim(),enrolled:Number(nums[0]),earned:Number(nums[1]),total:Number(nums[2])}}
+    function parseCourseLine(line){const codeMatch=line.match(/\b([A-Z]{3,4}\d{3,4})\b/);if(!codeMatch)return null;const code=codeMatch[1],before=line.slice(0,codeMatch.index).trim(),after=line.slice(codeMatch.index+code.length).trim(),prefix=before.match(/(제1전공|제1복수전공)\s+(교양|전공|선택|DS)\s+(\d{4})\s+(.+)$/);if(!prefix)return null;const creditMatch=after.match(/\s(\d+(?:\.\d+)?)\s+(A\+|A|B\+|B|C\+|C|D\+|D|F|P|수강[^\s]*)/);if(!creditMatch)return null;const titleArea=after.slice(0,creditMatch.index).trim().split(/\s+/),area=titleArea.pop()||'',name=titleArea.join(' '),tail=after.slice(creditMatch.index+1),status=/수강/.test(tail)?'enrolled':'earned';return{program:prefix[1],group:prefix[2],year:Number(prefix[3]),term:prefix[4].replace(/\s+/g,''),code,name,area,credits:Number(creditMatch[1]),status,raw:line}}
+    function courseAreaStats(courses,pattern){const selected=courses.filter(course=>course.program==='제1전공'&&pattern.test(course.area));return{earned:selected.filter(c=>c.status==='earned').reduce((sum,c)=>sum+c.credits,0),enrolled:selected.filter(c=>c.status==='enrolled').reduce((sum,c)=>sum+c.credits,0),courses:selected}}
+    function findCategoryRow(pages,label){for(const page of pages.slice(0,2)){for(const line of page.split(/\r?\n/)){if(line.includes(label)){const row=parseCategoryRow(line);if(row)return row}}}return null}
+    function numberAfter(text,re){const m=text.match(re);return m?Number(m[1]):null}function matchText(text,re){const m=text.match(re);return m?m[1].trim():''}
+    function renderResult(data,fileName){const pct=Math.min(100,Math.round(data.earned/data.target*100)),remain=Math.max(0,data.target-data.earned);document.getElementById('studentCollege').textContent=data.college||'소속 확인 필요';document.getElementById('studentDepartment').textContent=data.department||'학과 확인 필요';document.getElementById('studentEntryYear').textContent=data.entryYear||'학번 확인 필요';document.getElementById('studentName').textContent=data.name||'이름 확인 필요';document.getElementById('percent').textContent=pct;document.getElementById('docProfile').textContent=`${data.profile} · ${fileName}`;document.getElementById('creditSummary').textContent=remain?`${remain}학점`:'0학점';document.getElementById('scoreSub').textContent=data.enrolled>=remain&&remain>0?`현재 수강 중인 ${data.enrolled}학점을 모두 이수하면 교과학점 ${data.target}학점을 채웁니다.`:`현재 ${data.earned}학점을 취득했고 문서상 기준은 ${data.target}학점입니다.`;const misses=data.requirements.filter(r=>r.tone);document.getElementById('missingCount').textContent=misses.length+'개';document.getElementById('missingList').innerHTML=misses.slice(0,4).map((r,i)=>`<div class="missing-item"><div class="icon">${i+1}</div><div><strong>${r.name}</strong><p>${r.detail}</p></div><span class="tag">${r.status}</span></div>`).join('');const metrics=[{label:'전체 교과 학점',value:data.earned,max:data.target,note:`수강 중 ${data.enrolled}학점 포함 시 ${data.earned+data.enrolled}학점`},{label:'전공 학점',value:data.majorEarned,max:data.majorEarned!==null?data.majorEarned+data.majorEnrolled:null,note:data.majorEarned!==null?`수강 중 ${data.majorEnrolled}학점`:'문서에서 자동 분류되지 않음'},{label:'선택 학점',value:data.electiveEarned,max:data.electiveEarned!==null?data.electiveEarned+data.electiveEnrolled:null,note:data.electiveEarned!==null?`수강 중 ${data.electiveEnrolled}학점`:'문서에서 자동 분류되지 않음'}];document.getElementById('metricGrid').innerHTML=metrics.map(m=>`<article class="metric"><div class="metric-label">${m.label}</div><div class="metric-value">${m.value===null?'—':m.value}<small>${m.max===null?'':' / '+m.max+'학점'}</small></div><div class="thin"><span style="width:${m.value===null?0:Math.min(100,m.value/m.max*100)}%"></span></div><div class="metric-note">${m.note}</div></article>`).join('');document.getElementById('requirementList').innerHTML=data.requirements.map(r=>`<div class="req-row ${r.tone||''}"><div class="req-name">${r.name}</div><div class="req-detail">${r.detail}</div><span class="status ${r.tone||''}">${r.status}</span></div>`).join('')}
+    function renderResult(data,fileName){
+      latestResult=data;
+      const pct=Math.min(100,Math.round(data.earned/data.target*100)),remain=Math.max(0,data.target-data.earned),projected=data.earned+(data.enrolled||0)+(data.recognized||0),projectedRemain=Math.max(0,data.target-projected);
+      document.getElementById('studentCollege').textContent=data.college||'소속 확인 필요';
+      document.getElementById('studentDepartment').textContent=data.department||'학과 확인 필요';
+      document.getElementById('studentEntryYear').textContent=data.entryYear||'학번 확인 필요';
+      document.getElementById('studentName').textContent=data.name||'이름 확인 필요';
+      document.getElementById('percent').textContent=pct;
+      document.getElementById('docProfile').textContent=data.profile+' · '+fileName;
+      const sourceChips=document.querySelectorAll('.source-chip');if(sourceChips[0])sourceChips[0].textContent=data.isGraduate?'일반대학원 공식 기준':data.officialProfile?data.officialProfile.cohortLabel+'학번 공식 기준':'공식 프로필 미등록';
+      const notice=document.getElementById('noticeText');if(notice)notice.innerHTML='<b>이 결과는 졸업 가능 여부의 공식 판정이 아닙니다.</b> '+(data.officialProfile?data.officialProfile.sourceLabel+'을 적용했습니다. ':'학과별 공식 프로필을 찾지 못했습니다. ')+(data.officialProfile&&data.officialProfile.verifiedLevel==='graduation-only'?'이 학번은 전공 세부학점을 자동 확정하지 않고 GLS 확인 항목으로 표시합니다. ':'')+'최종 판정은 GLS 졸업요건충족현황 및 학과 행정실에서 확인하세요.';
+      document.getElementById('creditSummary').textContent=remain?remain+'학점':'0학점';
+      document.getElementById('scoreLabel').textContent=data.isGraduate?'현재 취득 학점 기준 수료 진행률':'현재 취득 학점 기준 졸업 진행률';
+      document.getElementById('scoreSub').textContent=!data.targetIsOfficial?'해당 학번의 학과별 졸업학점 원표가 없어 문서 합계를 임시 표시합니다. GLS 기준을 확인하세요.':projectedRemain?'현재 수강 중인 '+data.enrolled+'학점을 모두 이수하면 '+projected+'학점이며, 공식 기준까지 '+projectedRemain+'학점이 더 필요합니다.':'현재 수강 과목을 모두 이수하면 공식 '+(data.isGraduate?'수료':'졸업')+'학점 '+data.target+'학점에 도달합니다.';
+      const misses=data.requirements.filter(r=>r.tone);
+      document.getElementById('missingCount').textContent=misses.length+'개';
+      document.getElementById('missingList').innerHTML=misses.slice(0,4).map((r,i)=>'<div class="missing-item"><div class="icon">'+(i+1)+'</div><div><strong>'+r.name+'</strong><p>'+r.detail+'</p></div><span class="tag">'+r.status+'</span></div>').join('');
+      const selectionMax=data.electiveEarned!==null?data.electiveEarned+(data.electiveEnrolled||0):null;
+      const majorMax=data.majorTarget!==undefined&&data.majorTarget!==null?data.majorTarget:(data.majorEarned!==null?data.majorEarned+data.majorEnrolled:null);
+      const metrics=[
+        {label:data.isGraduate?'수료 총학점':'전체 졸업학점',value:data.earned,max:data.target,note:'수강 포함 예상 '+projected+'학점 · 이후 '+projectedRemain+'학점 필요'},
+        {label:data.isGraduate?'전공 학점':'제1전공 학점',value:data.majorEarned,max:majorMax,note:data.majorEarned!==null?'수강 중 '+data.majorEnrolled+'학점 · '+(data.majorRule?data.majorRule.label:'문서 분류')+' 기준':'문서에서 자동 분류되지 않음'},
+        {label:data.isGraduate?'선택 학점':'선택 분류 학점',value:data.electiveEarned,max:selectionMax,note:data.electiveEarned!==null?'수강 중 '+data.electiveEnrolled+'학점 · '+(data.isGraduate?'수료 총학점에 포함':'공식 최소기준과 별도'):'문서에서 자동 분류되지 않음'}
+      ];
+      document.getElementById('metricGrid').innerHTML=metrics.map(m=>'<article class="metric"><div class="metric-label">'+m.label+'</div><div class="metric-value">'+(m.value===null?'—':m.value)+'<small>'+(m.max===null?'':' / '+m.max+'학점')+'</small></div><div class="thin"><span style="width:'+(m.value===null||!m.max?0:Math.min(100,m.value/m.max*100))+'%"></span></div><div class="metric-note">'+m.note+'</div></article>').join('');
+      document.getElementById('requirementList').innerHTML=data.requirements.map(r=>'<div class="req-row '+(r.tone||'')+'"><div class="req-name">'+r.name+'</div><div class="req-detail">'+r.detail+'</div><span class="status '+(r.tone||'')+'">'+r.status+'</span></div>').join('');
+      const priorities=data.priorities||[];
+      document.getElementById('priorityGrid').innerHTML=priorities.length?priorities.map((item,i)=>'<article class="priority-card '+(item.urgent?'urgent':'')+'"><div class="priority-kicker">PRIORITY '+String(i+1).padStart(2,'0')+'</div><h3>'+item.title+'</h3><p>'+item.detail+'</p><button class="plan-button" data-plan-index="'+i+'">수강계획에 담기</button></article>').join(''):'<article class="priority-card"><h3>추가 우선과목 없음</h3><p>현재 확인 가능한 자동 판정 범위에서는 별도 우선 항목이 없습니다.</p></article>';
+      document.querySelectorAll('[data-plan-index]').forEach(button=>button.addEventListener('click',()=>{button.classList.toggle('saved');button.textContent=button.classList.contains('saved')?'계획에 담김':'수강계획에 담기'}));
+      document.getElementById('courseSummary').textContent=data.courses&&data.courses.length?'과목 행 '+data.courses.length+'개를 분석했습니다. 과목별 실제 개설 학기는 공식 수강편람 확인이 필요합니다.':'과목 행을 자동 인식하지 못해 학점 소계 중심으로 분석했습니다.';
+      document.getElementById('courseTree').innerHTML=(data.tree||[]).map(node=>'<article class="tree-node '+node.state+'"><span>'+node.label+'</span><strong>'+node.title+'</strong><p>'+node.detail+'</p></article>').join('');
+      document.getElementById('evidenceList').innerHTML=(data.evidence||[]).map(item=>'<article class="evidence"><strong>'+item.title+'</strong><p>'+item.detail+'</p></article>').join('');
+    }
+    async function copyPlanSummary(){
+      if(!latestResult)return;
+      const chosen=[...document.querySelectorAll('.plan-button.saved')].map(button=>button.closest('.priority-card').querySelector('h3').textContent),items=chosen.length?chosen:(latestResult.priorities||[]).map(item=>item.title);
+      const text=['GRAD PATH 수강계획 — '+latestResult.department+' '+latestResult.entryYear,'취득 '+latestResult.earned+'/'+latestResult.target+'학점 · 수강 중 '+latestResult.enrolled+'학점'].concat(items.map((item,i)=>(i+1)+'. '+item)).concat(['※ 공식 판정은 GLS와 학과 행정실에서 확인']).join('\n');
+      try{await navigator.clipboard.writeText(text);const button=document.getElementById('copyPlan');button.textContent='복사 완료';setTimeout(()=>button.textContent='수강계획 요약 복사',1500)}catch(e){console.warn(e)}
+    }
+  </script>
+</body>
+</html>
