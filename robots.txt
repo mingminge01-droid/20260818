@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://20260818.vercel.app/sitemap.xml
