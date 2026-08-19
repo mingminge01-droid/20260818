@@ -2,6 +2,8 @@
 
 성균관대학교 GLS 수강·취득 과목 PDF를 브라우저에서 분석하고, 분석이 끝나면 정규화된 결과를 Supabase에 자동 저장하는 웹 앱입니다. PDF 원본은 Supabase로 전송하지 않습니다.
 
+학생 이름 원문은 저장하지 않고 가운데 글자를 `*`로 가린 이름만 기록합니다(예: `설석환` → `설*환`, `박건` → `박*`). 분석 테이블에는 입학년도(`entry_year`), PDF의 이수·등록 학기 수로 계산한 학년(`academic_year`), 수강 중 학점(`enrolled_credits`)을 별도 열로 저장합니다. 학기를 확인하지 못한 경우 학년은 `null`로 남깁니다.
+
 ## Supabase 설정
 
 1. Supabase 대시보드의 SQL Editor에서 [`supabase/schema.sql`](supabase/schema.sql)을 실행합니다.
