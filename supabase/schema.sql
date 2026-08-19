@@ -17,6 +17,28 @@ alter table public.analysis_results
   add column if not exists enrolled_credits numeric(6,1) not null default 0 check (enrolled_credits >= 0);
 
 update public.analysis_results
+set
+  entry_year = coalesce(
+    entry_year,
+    (substring(result_data ->> 'profile' from '([0-9]{4})학번'))::integer
+  ),
+  enrolled_credits = case
+    when (result_data ->> 'enrolled') ~ '^[0-9]+(\.[0-9]+)?$'
+      then (result_data ->> 'enrolled')::numeric
+    else enrolled_credits
+  end,
+  academic_year = coalesce(
+    academic_year,
+    (
+      select ceil((substring(requirement ->> 'detail' from '([0-9]+)학기'))::numeric / 2)::integer
+      from jsonb_array_elements(coalesce(result_data -> 'requirements', '[]'::jsonb)) as requirement
+      where requirement ->> 'name' in ('등록 및 수업이수학기', '정규등록')
+        and requirement ->> 'detail' ~ '[0-9]+학기'
+      limit 1
+    )
+  );
+
+update public.analysis_results
 set student_name = case
   when student_name is null or btrim(student_name) = '' then '익명'
   when btrim(student_name) = '익명' then '익명'
